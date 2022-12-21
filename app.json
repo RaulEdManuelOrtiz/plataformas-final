@@ -21,13 +21,25 @@
       "supportsTablet": true
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDbmE0i-KE-7TJtoMfTToKicD4iYY2bBo0"
+        }
+      },
+      "package": "com.plataformas.proyecto"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f8fc8e8e-d056-4c90-8e5f-4ccf6bebf260"
+      }
     }
   }
 }

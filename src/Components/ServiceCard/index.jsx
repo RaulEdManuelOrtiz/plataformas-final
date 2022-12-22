@@ -26,7 +26,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   chip: {
+    marginTop: 8,
     // height: 30,
+    backgroundColor: '#F5F5F5',
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderColor: primaryColor,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  chipText: {
+    fontSize: 13,
+    color: primaryColor,
   },
 });
 
@@ -70,7 +82,13 @@ const ServiceCard = ({ navigation, item, displayStatus = true }) => {
             </View>
           ) : (
             <View style={styles.categoriesContainer}>
-              <Chip mode="outlined" compact style={styles.chip}>{item.category}</Chip>
+              <View
+                style={styles.chip}
+              >
+                <Text style={styles.chipText}>
+                  {item.categoryName}
+                </Text>
+              </View>
             </View>
           )}
         </View>

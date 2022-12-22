@@ -10,7 +10,7 @@ import * as Location from 'expo-location';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  createServiceFunc, getCategories, uploadImage,
+  createServiceFunc, getCategories,
 } from '../../Firebase/utils';
 import { primaryColor } from '../../Utils/constants';
 import { MyContext } from '../../../App';
@@ -70,7 +70,7 @@ const CreateService = ({ navigation }) => {
   const [description, setDescription] = useState('');
   const [serviceName, setServiceName] = useState('');
 
-  const [categorySelected, setCategorySelected] = useState();
+  const [categorySelected, setCategorySelected] = useState({});
   const [categories, setCategories] = useState([]);
 
   const [userAddress, setUserAddress] = useState('');
@@ -163,7 +163,8 @@ const CreateService = ({ navigation }) => {
   const handleCreateService = () => {
     setCreateServiceLoading(true);
     createServiceFunc({
-      categoryId: categorySelected,
+      categoryId: categorySelected.id,
+      categoryName: categorySelected.name,
       description,
       title: serviceName,
       image,
@@ -191,9 +192,9 @@ const CreateService = ({ navigation }) => {
           {categories.map((category) => {
             return (
               <Chip
-                mode={categorySelected === category.id ? 'flat' : 'outlined'}
+                mode={categorySelected.id === category.id ? 'flat' : 'outlined'}
                 key={category.id}
-                onPress={() => { setCategorySelected(category.id); }}
+                onPress={() => { setCategorySelected(category); }}
                 style={{ marginRight: 10 }}
               >
                 {category.name}

@@ -20,6 +20,7 @@ export const getCategories = (setCategories) => {
 
 export const createServiceFunc = async ({
   categoryId,
+  categoryName,
   description,
   title,
   image,
@@ -61,6 +62,7 @@ export const createServiceFunc = async ({
         getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
           addDoc(collection(db, 'service'), {
             categoryId,
+            categoryName,
             description,
             title,
             imageURL: downloadURL,
@@ -95,6 +97,23 @@ export const createServiceFunc = async ({
   }
 };
 
+export const getAllServices = async (userUid, setServices) => {
+  const myServicesArray = [];
+  const q = query(
+    collection(db, 'service'),
+    where('userUid', '!=', userUid),
+  );
+  const querySnapshot = await getDocs(q);
+
+  querySnapshot.forEach((document) => {
+    myServicesArray.push({
+      id: document.id,
+      ...document.data(),
+    });
+  });
+  setServices(myServicesArray);
+};
+
 export const getMyServices = async (userUid, setServices) => {
   const myServicesArray = [];
   const q = query(
@@ -103,15 +122,21 @@ export const getMyServices = async (userUid, setServices) => {
   );
   const querySnapshot = await getDocs(q);
 
-  await Promise.all(querySnapshot.docs.map(async (document) => {
-    const docRef = doc(db, 'category', document.data().categoryId);
-    const docSnap = await getDoc(docRef);
+  // await Promise.all(querySnapshot.docs.map(async (document) => {
+  //   const docRef = doc(db, 'category', document.data().categoryId);
+  //   const docSnap = await getDoc(docRef);
+  //   myServicesArray.push({
+  //     id: document.id,
+  //     ...document.data(),
+  //     category: docSnap.data().name,
+  //   });
+  // }));
+  querySnapshot.forEach((document) => {
     myServicesArray.push({
       id: document.id,
       ...document.data(),
-      category: docSnap.data().name,
     });
-  }));
+  });
 
   setServices(myServicesArray);
 };

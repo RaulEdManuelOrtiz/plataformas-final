@@ -22,9 +22,7 @@ const Maps = () => {
     longitudeDelta: 0.0421,
   });
 
-  console.log('mapRegion', mapRegion);
   const getLocation = async () => {
-    console.log('ANDROID BUNDLING COMPLETE');
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       console.log('Permission to access location was denied');
@@ -32,7 +30,6 @@ const Maps = () => {
     }
 
     const location = await Location.getCurrentPositionAsync({});
-    console.log('location', location);
     setMapRegion({
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,

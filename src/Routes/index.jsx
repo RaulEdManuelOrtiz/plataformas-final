@@ -6,6 +6,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import routesList from './routesDictionary';
 import CreateService from '../Components/CreateService';
 import Header from '../Components/Header';
+import UserProfile from '../Components/UserProfile';
 
 const BottomTab = createBottomTabNavigator();
 
@@ -77,6 +78,25 @@ const RootNavigator = () => {
         >
           {/*  eslint-disable-next-line */}
           {(props) => { return <CreateService {...props} />; }}
+        </Stack.Screen>
+        <Stack.Screen
+          name="UserProfile"
+          options={{
+            contentStyle: { backgroundColor: 'white' },
+            header: ({ navigation }) => {
+              return (
+                <Header
+                  title="Perfil"
+                  icon="chevron-left"
+                  onPress={navigation.goBack}
+                  iconSize={36}
+                />
+              );
+            },
+          }}
+        >
+          {/*  eslint-disable-next-line */}
+              {(props) => { return <UserProfile {...props} />; }}
         </Stack.Screen>
       </Stack.Group>
     </Stack.Navigator>

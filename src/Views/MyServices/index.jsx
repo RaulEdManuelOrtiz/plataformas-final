@@ -77,11 +77,10 @@ const MyServices = ({ navigation }) => {
 
   useEffect(() => {
     const subscribe = onSnapshot(getMyApplyingQuery, (snapshot) => {
-      console.log('snapshot', snapshot);
       setApplyingServices(
         snapshot
           .docs
-          .map((snapDoc) => { return { id: snapDoc.id, ...snapDoc.data() }; }),
+          .map((snapDoc) => { return { ...snapDoc.data(), id: snapDoc.id }; }),
       );
     });
 

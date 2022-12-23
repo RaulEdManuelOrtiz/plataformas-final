@@ -105,7 +105,6 @@ const getAllServicesQuery = (userUid) => {
 };
 
 export const getAllServices = async (userUid, setServices) => {
-  console.log;
   const myServicesArray = [];
   const q = query(
     collection(db, 'service'),

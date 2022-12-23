@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import {
+  FlatList,
   Image, ScrollView, StyleSheet, View,
 } from 'react-native';
 import {
@@ -11,7 +12,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
 import {
   addDoc,
-  collection, doc, getDoc, onSnapshot, query, Timestamp, updateDoc, arrayUnion,
+  collection, doc, getDoc, onSnapshot, query, Timestamp, updateDoc, arrayUnion, where,
 } from 'firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import {
@@ -20,7 +21,8 @@ import {
 import { primaryColor } from '../../Utils/constants';
 import { MyContext } from '../../../App';
 import { db } from '../../Firebase/config';
-import { iconColor } from '../ServiceCard';
+import ServiceCard, { iconColor } from '../ServiceCard';
+import UserCard from '../UserCard';
 
 const styles = StyleSheet.create({
   view: {
@@ -83,8 +85,7 @@ const CreateService = ({ navigation }) => {
     readOnly, serviceId, applying, applyingServiceId,
   } = uiData;
   const [categorySelected, setCategorySelected] = useState({});
-
-  console.log('applying', applying);
+  //
   const [userAddress, setUserAddress] = useState('');
   const [userPosition, serUserPosition] = useState();
 
@@ -99,7 +100,7 @@ const CreateService = ({ navigation }) => {
   };
 
   useEffect(() => {
-    const subscribe = onSnapshot(doc(db, 'service', serviceId), (snapshot) => {
+    const subscribe = onSnapshot(doc(db, 'service', serviceId || 'q'), (snapshot) => {
       setServiceData({ id: snapshot.id, ...snapshot.data() });
     });
     return () => {
@@ -192,7 +193,6 @@ const CreateService = ({ navigation }) => {
     getUserPosition();
   }, [userPosition]);
 
-  // console.log('Locationa', requestForegroundPermissionsAsync);
   const userLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
 
@@ -250,6 +250,14 @@ const CreateService = ({ navigation }) => {
 
   const handleApplyingService = async () => {
     setCreateApplyingServiceLoading(true);
+    let userData = {};
+    const docRef = doc(db, 'user', user.uid);
+    const docSnap = await getDoc(docRef);
+    userData = {
+      id: docSnap.id,
+      ...docSnap.data(),
+    };
+
     const newApplyingService = await addDoc(collection(db, 'applyingService'), {
       userUid: user.uid,
       serviceId: serviceData.id,
@@ -261,10 +269,12 @@ const CreateService = ({ navigation }) => {
       categoryName: serviceData.categoryName,
       imageURL: serviceData.imageURL,
       phoneNumber,
+      ...userData,
     });
     const userRef = doc(db, 'user', user.uid);
     await updateDoc(userRef, {
       serviceApplyingIds: arrayUnion(newApplyingService.id),
+      phoneNumber,
     });
 
     const serviceRef = doc(db, 'service', serviceData.id);
@@ -273,6 +283,87 @@ const CreateService = ({ navigation }) => {
     });
     navigation.navigate('MyServices');
     setCreateApplyingServiceLoading(false);
+  };
+
+  const [applyingServices, setApplyingServices] = useState();
+  const getApplyingServicesQuery = query(
+    collection(db, 'applyingService'),
+    where('serviceId', '==', serviceId || 'q'),
+  );
+
+  useEffect(() => {
+    const subscribe = onSnapshot(getApplyingServicesQuery, (snapshot) => {
+      setApplyingServices(
+        snapshot.docs.map((snapDoc) => { return { ...snapDoc.data(), id: snapDoc.id }; }),
+      );
+    });
+
+    return () => {
+      subscribe();
+    };
+  }, [user]);
+
+  const [completeServiceApplyingLoading, setCompleteServiceApplyingLoading] = useState(false);
+  const handleCompleteServiceApplying = async () => {
+    setCompleteServiceApplyingLoading(true);
+    const applyingServiceRef = doc(db, 'applyingService', applyingServiceId);
+
+    await updateDoc(applyingServiceRef, {
+      status: 'Realizado',
+    });
+
+    const serviceRef = doc(db, 'service', serviceId);
+
+    await updateDoc(serviceRef, {
+      status: 'Realizado',
+    });
+    setCompleteServiceApplyingLoading(false);
+    navigation.navigate('MyServices');
+  };
+
+  const [closedServiceApplyingLoading, setClosedServiceApplyingLoading] = useState(false);
+
+  const [rates, setRates] = useState([
+    {
+      value: 'sdfvbc',
+      label: 1,
+    },
+    {
+      value: 'hjbn',
+      label: 2,
+    },
+    {
+      value: 'hjkyu',
+      label: 3,
+    },
+    {
+      value: 'wegfh',
+      label: 4,
+    },
+    {
+      value: 'ytuyu',
+      label: 5,
+    },
+  ]);
+
+  const [selectedRate, setSelectedRate] = useState({});
+  const [comment, setComment] = useState('');
+  const handleClosedServiceApplying = async () => {
+    setClosedServiceApplyingLoading(true);
+    const applyingServiceRef = doc(db, 'applyingService', applyingServiceId);
+
+    await updateDoc(applyingServiceRef, {
+      comment,
+      selectedRate: selectedRate.label,
+    });
+
+    const serviceRef = doc(db, 'service', serviceId);
+
+    await updateDoc(serviceRef, {
+      status: 'Cerrado',
+    });
+    setClosedServiceApplyingLoading(false);
+    navigation.navigate('MyServices');
   };
 
   return (
@@ -316,14 +407,14 @@ const CreateService = ({ navigation }) => {
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', ...styles.component }}>
-                {categories.map((category) => {
+                {categories?.map((category) => {
                   return (
                     <Chip
                       mode={categorySelected.id === category.id ? 'flat' : 'outlined'}
                       key={category.id}
                       style={{ marginRight: 10 }}
-                            // eslint-disable-next-line
-                            {...!readOnly && { onPress: () => { setCategorySelected(category); } }}
+                      // eslint-disable-next-line
+                      {...!readOnly && { onPress: () => { setCategorySelected(category); } }}
                     >
                       {category.name}
                     </Chip>
@@ -443,24 +534,23 @@ const CreateService = ({ navigation }) => {
               >
                 {image && <Image source={{ uri: image.uri }} style={{ width: 200, height: 200 }} />}
               </View>
-              {!readOnly
-                    && (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        width: '100%',
-                        justifyContent: 'center',
-                        ...styles.component,
-                      }}
-                    >
-                      <Button icon="file" onPress={selectImageFromFile}>
-                        Seleccionar imagen
-                      </Button>
-                      <Button icon="camera" onPress={selectImageFromCamera}>
-                        Tomar foto
-                      </Button>
-                    </View>
-                    )}
+              {!readOnly && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  width: '100%',
+                  justifyContent: 'center',
+                  ...styles.component,
+                }}
+              >
+                <Button icon="file" onPress={selectImageFromFile}>
+                  Seleccionar imagen
+                </Button>
+                <Button icon="camera" onPress={selectImageFromCamera}>
+                  Tomar foto
+                </Button>
+              </View>
+              )}
             </View>
             { !readOnly && (
             <View style={styles.component}>
@@ -477,13 +567,14 @@ const CreateService = ({ navigation }) => {
             <View style={{ marginTop: 32 }}>
               <View style={styles.label}>
                 <Text variant="labelLarge">
+                  {serviceData.status === ''}
                   Ingrese una cotización del servicio
                 </Text>
               </View>
               <View style={styles.component}>
                 <TextInput
                   mode="outlined"
-                  value={price || applyingServiceData?.price}
+                  value={price || applyingServiceData?.price || ''}
                   onChangeText={(text) => { return setPrice(text); }}
                   outlineStyle={{ borderRadius: 12 }}
                   style={styles.input}
@@ -503,7 +594,7 @@ const CreateService = ({ navigation }) => {
               <View style={styles.component}>
                 <TextInput
                   mode="outlined"
-                  value={phoneNumber || applyingServiceData?.phoneNumber}
+                  value={phoneNumber || applyingServiceData?.phoneNumber || ''}
                   onChangeText={(text) => { return setPhoneNumber(text); }}
                   outlineStyle={{ borderRadius: 12 }}
                   style={styles.input}
@@ -536,8 +627,206 @@ const CreateService = ({ navigation }) => {
             style={styles.loader}
           />
         )
-      }
-
+        }
+      {(serviceData?.status === 'Solicitado' && !applying)
+          && (
+          <View style={{ marginTop: 32 }}>
+            <View style={styles.label}>
+              <Text variant="labelLarge">
+                Ofertas para el servicio
+              </Text>
+            </View>
+            {applyingServices ? (
+              applyingServices?.map((applyingItem) => {
+                return (
+                  <UserCard
+                    key={applyingItem.id}
+                    item={applyingItem}
+                    navigation={navigation}
+                        // displayStatus={false}
+                    uiData={uiData}
+                    setUiData={setUiData}
+                  />
+                );
+              })
+            )
+              : (
+                <ActivityIndicator
+                  animating
+                  style={styles.loader}
+                />
+              )}
+          </View>
+          )}
+      {(serviceData?.status === 'Acordado' && !applying)
+          && (
+          <View style={{ marginTop: 32 }}>
+            <View style={styles.label}>
+              <Text variant="labelLarge">
+                Contratado
+              </Text>
+            </View>
+            {applyingServices ? (
+              applyingServices?.map((applyingItem) => {
+                return (
+                  <UserCard
+                    key={applyingItem.id}
+                    item={applyingItem}
+                    navigation={navigation}
+                                  // displayStatus={false}
+                    uiData={uiData}
+                    setUiData={setUiData}
+                    displayContact
+                  />
+                );
+              })
+            )
+              : (
+                <ActivityIndicator
+                  animating
+                  style={styles.loader}
+                />
+              )}
+            <View style={{ ...styles.label, marginTop: 24 }}>
+              <Text variant="labelLarge">
+                Contacto
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24 }}>
+              <IconButton
+                icon="cellphone"
+                iconColor={primaryColor}
+                size={36}
+                  // onPress={() => { auth().signOut(); }}
+              />
+              <IconButton
+                icon="whatsapp"
+                iconColor={primaryColor}
+                size={36}
+              />
+              <IconButton
+                icon="email"
+                iconColor={primaryColor}
+                size={36}
+              />
+              {/* {applyingServices[0]} */}
+            </View>
+          </View>
+          )}
+      { (serviceData?.status === 'Acordado' && applying) && (
+      <View style={styles.component}>
+        <Button
+          mode="contained"
+          loading={completeServiceApplyingLoading}
+          onPress={handleCompleteServiceApplying}
+        >
+          Marcar como realizado
+        </Button>
+      </View>
+      )}
+      { (serviceData?.status === 'Realizado' && !applying) && (
+      <View style={{ ...styles.component, marginTop: 32 }}>
+        <View style={{ marginTop: 32 }}>
+          <View style={styles.label}>
+            <Text variant="labelLarge">
+              Contratado
+            </Text>
+          </View>
+          {applyingServices ? (
+            applyingServices?.map((applyingItem) => {
+              return (
+                <UserCard
+                  key={applyingItem.id}
+                  item={applyingItem}
+                  navigation={navigation}
+                            // displayStatus={false}
+                  uiData={uiData}
+                  setUiData={setUiData}
+                  displayContact
+                />
+              );
+            })
+          )
+            : (
+              <ActivityIndicator
+                animating
+                style={styles.loader}
+              />
+            )}
+          <View style={{ ...styles.label, marginTop: 24 }}>
+            <Text variant="labelLarge">
+              Contacto
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24 }}>
+            <IconButton
+              icon="cellphone"
+              iconColor={primaryColor}
+              size={36}
+                // onPress={() => { auth().signOut(); }}
+            />
+            <IconButton
+              icon="whatsapp"
+              iconColor={primaryColor}
+              size={36}
+            />
+            <IconButton
+              icon="email"
+              iconColor={primaryColor}
+              size={36}
+            />
+            {/* {applyingServices[0]} */}
+          </View>
+        </View>
+        <View style={styles.label}>
+          <Text variant="labelLarge">
+            Calificación del servicio
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', ...styles.component }}>
+          {rates?.map((rate) => {
+            return (
+              <Chip
+                mode={selectedRate.value === rate.value ? 'flat' : 'outlined'}
+                key={rate.value}
+                style={{ marginRight: 10 }}
+                onPress={() => { setSelectedRate(rate); }}
+              >
+                {rate.label}
+              </Chip>
+            );
+          })}
+        </View>
+        <View style={styles.label}>
+          <Text variant="labelLarge">
+            Comentario
+          </Text>
+        </View>
+        <View>
+          <TextInput
+            mode="outlined"
+            value={comment}
+            onChangeText={(text) => { return setComment(text); }}
+            outlineStyle={{ borderRadius: 12 }}
+            multiline
+            numberOfLines={4}
+            style={styles.input}
+            activeOutlineColor="transparent"
+            outlineColor="transparent"
+            textColor={primaryColor}
+            selectionColor={primaryColor}
+          />
+        </View>
+        <Button
+          style={{ marginTop: 32 }}
+          mode="contained"
+          loading={closedServiceApplyingLoading}
+          onPress={handleClosedServiceApplying}
+        >
+          Marcar como realizado
+        </Button>
+      </View>
+      )}
     </ScrollView>
   );
 };

@@ -24,6 +24,7 @@ const Login = () => {
           lastConnect: Timestamp.now(),
           photoURL: user.user.photoURL,
           name: user.user.displayName,
+          email: user.user.email,
         }, { merge: true });
       })
       .catch((e) => { return console.log(e); });

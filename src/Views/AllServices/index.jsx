@@ -6,10 +6,15 @@ import {
   ActivityIndicator,
   Avatar, Card, IconButton, Searchbar, SegmentedButtons, Text,
 } from 'react-native-paper';
+import {
+  collection, query, where, onSnapshot,
+} from 'firebase/firestore';
+import auth from '@react-native-firebase/auth';
 import { primaryColor } from '../../Utils/constants';
 import { MyContext } from '../../../App';
 import ServiceCard from '../../Components/ServiceCard';
-import { getAllServices, getCategories, getMyServices } from '../../Firebase/utils';
+import { getCategories } from '../../Firebase/utils';
+import { db } from '../../Firebase/config';
 
 const styles = StyleSheet.create({
   container: {
@@ -79,27 +84,36 @@ const message = (currentHour) => {
 };
 
 const AllServices = ({ navigation }) => {
-  const user = useContext(MyContext);
+  const [user, setUser, uiData, setUiData] = useContext(MyContext);
   const today = new Date();
   const currentHour = today.getHours();
-  const [loading, setLoading] = useState(false);
-
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [value, setValue] = React.useState('all');
 
-  const [services, setServices] = useState([]);
+  const [services, setServices] = useState();
   const [categories, setCategories] = useState([]);
 
-  const [filteredServices, setFilteredServices] = useState([]);
+  const [filteredServices, setFilteredServices] = useState();
+
+  const getAllServicesQuery = query(
+    collection(db, 'service'),
+    where('userUid', '!=', user.uid),
+  );
 
   const getData = async () => {
-    setLoading(true);
-    await getAllServices(user.uid, setServices);
     await getCategories(setCategories);
-    setLoading(false);
   };
+
   useEffect(() => {
-    getData();
+    const subscribe = onSnapshot(getAllServicesQuery, (snapshot) => {
+      setServices(snapshot.docs.map((doc) => { return { id: doc.id, ...doc.data() }; }));
+    });
+
+    return () => {
+      getData();
+      subscribe();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -131,8 +145,6 @@ const AllServices = ({ navigation }) => {
     handleFilter(newValue, searchQuery);
   };
 
-  console.log('services', services);
-
   return (
     <View style={styles.container}>
       <Card style={styles.userInfo} elevation={0} mode="contained">
@@ -146,7 +158,8 @@ const AllServices = ({ navigation }) => {
            // eslint-disable-next-line
          right={() => {return (
            <IconButton
-             icon="bell-outline"
+             icon="logout"
+             onPress={() => { auth().signOut(); }}
            />
          );
          }}
@@ -214,12 +227,7 @@ const AllServices = ({ navigation }) => {
           />
         </ScrollView>
       </View>
-      {loading ? (
-        <ActivityIndicator
-          animating
-          style={styles.loader}
-        />
-      ) : (
+      {filteredServices ? (
         <FlatList
           showsVerticalScrollIndicator={false}
           data={filteredServices}
@@ -231,12 +239,20 @@ const AllServices = ({ navigation }) => {
                   item={item}
                   navigation={navigation}
                   displayStatus={false}
+                  uiData={uiData}
+                  setUiData={setUiData}
                 />
               );
             }
               }
         />
-      )}
+      )
+        : (
+          <ActivityIndicator
+            animating
+            style={styles.loader}
+          />
+        )}
 
     </View>
   );

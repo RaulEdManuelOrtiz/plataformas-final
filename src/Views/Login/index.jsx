@@ -2,26 +2,29 @@ import React from 'react';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import auth from '@react-native-firebase/auth';
 import { Button } from 'react-native-paper';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../../Firebase/config';
 
 const Login = () => {
   GoogleSignin.configure({
     webClientId: '221357654076-b0v66jcjt4jvm14r1eksijkrtekj1lap.apps.googleusercontent.com',
   });
   const onGoogleButtonPress = async () => {
-    // Check if your device supports Google Play
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    // Get the users ID token
+    await GoogleSignin.hasPlayServices();
     const { idToken } = await GoogleSignin.signIn();
 
-    // Create a Google credential with the token
     const googleCredential = auth.GoogleAuthProvider.credential(idToken);
 
-    // Sign-in the user with the credential
     const userSignIn = auth().signInWithCredential(googleCredential);
 
     userSignIn
       .then((user) => {
-        // navigation.navigate('Root');
+        const ref = doc(db, 'user', user.user.uid);
+        setDoc(ref, {
+          lastConnect: Timestamp.now(),
+          photoURL: user.user.photoURL,
+          name: user.user.displayName,
+        }, { merge: true });
       })
       .catch((e) => { return console.log(e); });
   };

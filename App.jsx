@@ -24,7 +24,7 @@ export const MyContext = createContext();
 const App = () => {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState();
-
+  const [uiData, setUiData] = useState({});
   const theme = {
     ...MD3LightTheme,
     colors, // Copy it from the color codes scheme and then use it here
@@ -49,7 +49,7 @@ const App = () => {
     );
   }
   return (
-    <MyContext.Provider value={user}>
+    <MyContext.Provider value={[user, setUser, uiData, setUiData]}>
       <PaperProvider theme={theme}>
         <SafeAreaProvider>
           <Navigation />

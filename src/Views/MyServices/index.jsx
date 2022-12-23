@@ -1,11 +1,15 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { ActivityIndicator, FAB, SegmentedButtons } from 'react-native-paper';
+import {
+  collection, onSnapshot, query, where, doc,
+} from 'firebase/firestore';
 import Header from '../../Components/Header';
 import { primaryColor } from '../../Utils/constants';
 import { getMyServices } from '../../Firebase/utils';
 import { MyContext } from '../../../App';
 import ServiceCard from '../../Components/ServiceCard';
+import { db } from '../../Firebase/config';
 
 const styles = StyleSheet.create({
   view: {
@@ -46,15 +50,44 @@ const styles = StyleSheet.create({
 
 const MyServices = ({ navigation }) => {
   const [value, setValue] = React.useState('one');
-  const user = useContext(MyContext);
-  const [services, setServices] = useState([]);
+  const [user, setUser, uiData, setUiData] = useContext(MyContext);
+  const [services, setServices] = useState();
   const [loading, setLoading] = useState(false);
+
+  const getMyServicesQuery = query(
+    collection(db, 'service'),
+    where('userUid', '==', user.uid),
+  );
+
   useEffect(() => {
-    setLoading(true);
-    getMyServices(user.uid, setServices)
-      .then(() => {
-        setLoading(false);
-      });
+    const subscribe = onSnapshot(getMyServicesQuery, (snapshot) => {
+      setServices(snapshot.docs.map((doc) => { return { id: doc.id, ...doc.data() }; }));
+    });
+
+    return () => {
+      subscribe();
+    };
+  }, [user]);
+
+  const [applyingServices, setApplyingServices] = useState();
+  const getMyApplyingQuery = query(
+    collection(db, 'applyingService'),
+    where('userUid', '==', user.uid),
+  );
+
+  useEffect(() => {
+    const subscribe = onSnapshot(getMyApplyingQuery, (snapshot) => {
+      console.log('snapshot', snapshot);
+      setApplyingServices(
+        snapshot
+          .docs
+          .map((snapDoc) => { return { id: snapDoc.id, ...snapDoc.data() }; }),
+      );
+    });
+
+    return () => {
+      subscribe();
+    };
   }, [user]);
 
   return (
@@ -96,32 +129,73 @@ const MyServices = ({ navigation }) => {
           ]}
         />
       </View>
-      {value === 'one' && (
-      <View>
-          {loading ? (
-            <ActivityIndicator
-              animating
-              style={styles.loader}
-            />
-          ) : (
+      {value === 'one' ? (
+        <View>
+          {services ? (
             <FlatList
               showsVerticalScrollIndicator={false}
               data={services}
               style={styles.loader}
               renderItem={
-                    ({ item }) => {
-                      return <ServiceCard item={item} navigation={navigation} />;
-                    }
-                  }
+                ({ item }) => {
+                  return (
+                    <ServiceCard
+                      item={item}
+                      navigation={navigation}
+                      uiData={uiData}
+                      setUiData={setUiData}
+                    />
+                  );
+                }
+              }
+            />
+          ) : (
+            <ActivityIndicator
+              animating
+              style={styles.loader}
             />
           )}
-        <FAB
-          icon="plus"
-          style={styles.fab}
-          onPress={() => { return navigation.navigate('CreateService'); }}
-        />
-      </View>
-
+          <FAB
+            icon="plus"
+            style={styles.fab}
+            onPress={() => {
+              setUiData({
+                ...uiData,
+                readOnly: false,
+                applying: false,
+              });
+              navigation.navigate('CreateService');
+            }}
+          />
+        </View>
+      ) : (
+        <View>
+          {applyingServices ? (
+            <FlatList
+              showsVerticalScrollIndicator={false}
+              data={applyingServices}
+              style={styles.loader}
+              renderItem={
+                ({ item }) => {
+                  return (
+                    <ServiceCard
+                      item={item}
+                      navigation={navigation}
+                      uiData={uiData}
+                      setUiData={setUiData}
+                      applying
+                    />
+                  );
+                }
+            }
+            />
+          ) : (
+            <ActivityIndicator
+              animating
+              style={styles.loader}
+            />
+          )}
+        </View>
       )}
     </View>
   );

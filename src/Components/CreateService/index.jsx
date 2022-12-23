@@ -4,16 +4,23 @@ import {
 } from 'react-native';
 import {
   ActivityIndicator,
-  Button, Chip, Modal, Portal, Text, TextInput, TouchableRipple,
+  Button, Chip, IconButton, Modal, Portal, Text, TextInput, TouchableRipple,
 } from 'react-native-paper';
 import * as Location from 'expo-location';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  addDoc,
+  collection, doc, getDoc, onSnapshot, query, Timestamp, updateDoc, arrayUnion,
+} from 'firebase/firestore';
+import auth from '@react-native-firebase/auth';
+import {
   createServiceFunc, getCategories,
 } from '../../Firebase/utils';
 import { primaryColor } from '../../Utils/constants';
 import { MyContext } from '../../../App';
+import { db } from '../../Firebase/config';
+import { iconColor } from '../ServiceCard';
 
 const styles = StyleSheet.create({
   view: {
@@ -61,27 +68,83 @@ const styles = StyleSheet.create({
   component: {
     marginBottom: 28,
   },
+  loader: {
+    height: '100%',
+  },
 });
 
 const CreateService = ({ navigation }) => {
   const [createServiceLoading, setCreateServiceLoading] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(true);
-  const user = useContext(MyContext);
+  const [user, setUser, uiData, setUiData] = useContext(MyContext);
   const [description, setDescription] = useState('');
   const [serviceName, setServiceName] = useState('');
-
+  const {
+    readOnly, serviceId, applying, applyingServiceId,
+  } = uiData;
   const [categorySelected, setCategorySelected] = useState({});
-  const [categories, setCategories] = useState([]);
 
+  console.log('applying', applying);
   const [userAddress, setUserAddress] = useState('');
   const [userPosition, serUserPosition] = useState();
 
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState([]);
+
+  // ReadOnly
+  const [serviceData, setServiceData] = useState();
+
+  const getData = async () => {
+    await getCategories(setCategories);
+  };
+
   useEffect(() => {
-    getCategories(setCategories);
+    const subscribe = onSnapshot(doc(db, 'service', serviceId), (snapshot) => {
+      setServiceData({ id: snapshot.id, ...snapshot.data() });
+    });
+    return () => {
+      if (serviceId) {
+        subscribe();
+      }
+    };
   }, []);
-  const [mapRegion, setMapRegion] = useState();
+
+  useEffect(() => {
+    getData();
+  }, []);
+
+  const [applyingServiceData, setApplyingServiceData] = useState();
+  useEffect(() => {
+    const subscribe = onSnapshot(doc(db, 'applyingService', applyingServiceId || 'q'), (snapshot) => {
+      setApplyingServiceData({ id: snapshot.id, ...snapshot.data() });
+    });
+    return () => {
+      if (applying) {
+        subscribe();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    getData();
+  }, []);
 
   const [image, setImage] = useState(null);
+
+  useEffect(() => {
+    if (readOnly && serviceData) {
+      setCategorySelected({ id: serviceData.categoryId });
+      setServiceName(serviceData.title);
+      setDescription(serviceData.description);
+      setUserAddress(serviceData.address);
+      serUserPosition(
+        { latitude: serviceData.latitude, longitude: serviceData.longitude },
+      );
+      setImage({ uri: serviceData.imageURL });
+    }
+  }, [serviceData]);
+
+  const [mapRegion, setMapRegion] = useState();
 
   const selectImageFromCamera = async () => {
     try {
@@ -180,164 +243,301 @@ const CreateService = ({ navigation }) => {
       });
   };
 
+  // APPLYING
+  const [price, setPrice] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [createApplyingServiceLoading, setCreateApplyingServiceLoading] = useState(false);
+
+  const handleApplyingService = async () => {
+    setCreateApplyingServiceLoading(true);
+    const newApplyingService = await addDoc(collection(db, 'applyingService'), {
+      userUid: user.uid,
+      serviceId: serviceData.id,
+      status: 'En evaluacion',
+      price,
+      created: Timestamp.now(),
+      title: serviceData.title,
+      address: serviceData.address,
+      categoryName: serviceData.categoryName,
+      imageURL: serviceData.imageURL,
+      phoneNumber,
+    });
+    const userRef = doc(db, 'user', user.uid);
+    await updateDoc(userRef, {
+      serviceApplyingIds: arrayUnion(newApplyingService.id),
+    });
+
+    const serviceRef = doc(db, 'service', serviceData.id);
+    await updateDoc(serviceRef, {
+      status: 'Solicitado',
+    });
+    navigation.navigate('MyServices');
+    setCreateApplyingServiceLoading(false);
+  };
+
   return (
     <ScrollView style={styles.view}>
-      <View>
-        <View style={styles.label}>
-          <Text variant="labelLarge">
-            Seleccione las categorías del servicio
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', ...styles.component }}>
-          {categories.map((category) => {
-            return (
-              <Chip
-                mode={categorySelected.id === category.id ? 'flat' : 'outlined'}
-                key={category.id}
-                onPress={() => { setCategorySelected(category); }}
-                style={{ marginRight: 10 }}
-              >
-                {category.name}
-              </Chip>
-            );
-          })}
-        </View>
-      </View>
-      <View>
-        <View style={styles.label}>
-          <Text variant="labelLarge">
-            Resumen del servicio
-          </Text>
-        </View>
-        <View style={styles.component}>
-          <TextInput
-            mode="outlined"
-            value={serviceName}
-            onChangeText={(text) => { return setServiceName(text); }}
-            outlineStyle={{ borderRadius: 12 }}
-            style={styles.input}
-            activeOutlineColor="transparent"
-            outlineColor="transparent"
-            textColor={primaryColor}
-            selectionColor={primaryColor}
-          />
-        </View>
-      </View>
-      <View>
-        <View style={styles.label}>
-          <Text variant="labelLarge">
-            Desripción
-          </Text>
-        </View>
-        <View style={styles.component}>
-          <TextInput
-            mode="outlined"
-            value={description}
-            onChangeText={(text) => { return setDescription(text); }}
-            outlineStyle={{ borderRadius: 12 }}
-            multiline
-            numberOfLines={4}
-            style={styles.input}
-            activeOutlineColor="transparent"
-            outlineColor="transparent"
-            textColor={primaryColor}
-            selectionColor={primaryColor}
-          />
-        </View>
-      </View>
-      <View>
-        <View style={styles.label}>
-          <Text variant="labelLarge">
-            Ubicación donde realizar el servicio
-          </Text>
-        </View>
-        <View style={styles.component}>
-          <TextInput
-            mode="outlined"
-            value={userAddress}
-            onChangeText={(text) => { return setDescription(text); }}
-            outlineStyle={{ borderRadius: 12 }}
-            style={styles.input}
-            theme={{ colors: { primary: primaryColor } }}
-            multiline
-            numberOfLines={4}
-            disabled
-            activeOutlineColor="transparent"
-            outlineColor="transparent"
-            textColor={primaryColor}
-            selectionColor={primaryColor}
-          />
-          <View style={{ marginTop: 16 }}>
-            {loadingLocation
-              ? (
-                <ActivityIndicator
-                  animating
-                  style={styles.map}
-                />
-              )
-              : (
-                <MapView
-                  style={styles.map}
-                  provider={PROVIDER_GOOGLE}
-                  region={mapRegion}
-                  addressForCoordinate
+      {
+        serviceData ? (
+          <View>
+            {applying && (
+            <View>
+              <View style={styles.label}>
+                <Text variant="labelLarge">
+                  Estado
+                </Text>
+              </View>
+              <View style={styles.component}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    marginLeft: 10,
+                  }}
                 >
-                  <Marker
-                    coordinate={mapRegion}
-                    title="marker"
-                    draggable
-                    onDragEnd={(e) => {
-                      serUserPosition({
-                        latitude: e.nativeEvent.coordinate.latitude,
-                        longitude: e.nativeEvent.coordinate.longitude,
-                      });
-                    }}
+                  <IconButton
+                    size={18}
+                    style={{ marginLeft: -16 }}
+                    iconColor={iconColor[applyingServiceData?.status]}
+                    icon="checkbox-blank-circle"
                   />
-                </MapView>
+                  <Text variant="bodyLarge" style={{ color: primaryColor }}>
+                    {applyingServiceData?.status}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            )}
+            <View>
+              <View style={styles.label}>
+                <Text variant="labelLarge">
+                  Seleccione las categorías del servicio
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', ...styles.component }}>
+                {categories.map((category) => {
+                  return (
+                    <Chip
+                      mode={categorySelected.id === category.id ? 'flat' : 'outlined'}
+                      key={category.id}
+                      style={{ marginRight: 10 }}
+                            // eslint-disable-next-line
+                            {...!readOnly && { onPress: () => { setCategorySelected(category); } }}
+                    >
+                      {category.name}
+                    </Chip>
+                  );
+                })}
+              </View>
+            </View>
+            <View>
+              <View style={styles.label}>
+                <Text variant="labelLarge">
+                  Resumen del servicio
+                </Text>
+              </View>
+              <View style={styles.component}>
+                <TextInput
+                  mode="outlined"
+                  value={serviceName}
+                  onChangeText={(text) => { return setServiceName(text); }}
+                  outlineStyle={{ borderRadius: 12 }}
+                  style={styles.input}
+                  activeOutlineColor="transparent"
+                  outlineColor="transparent"
+                  textColor={primaryColor}
+                  selectionColor={primaryColor}
+                  disabled={readOnly}
+                />
+              </View>
+            </View>
+            <View>
+              <View style={styles.label}>
+                <Text variant="labelLarge">
+                  Desripción
+                </Text>
+              </View>
+              <View style={styles.component}>
+                <TextInput
+                  mode="outlined"
+                  value={description}
+                  onChangeText={(text) => { return setDescription(text); }}
+                  outlineStyle={{ borderRadius: 12 }}
+                  multiline
+                  numberOfLines={4}
+                  style={styles.input}
+                  activeOutlineColor="transparent"
+                  outlineColor="transparent"
+                  textColor={primaryColor}
+                  selectionColor={primaryColor}
+                  disabled={readOnly}
+                />
+              </View>
+            </View>
+            <View>
+              <View style={styles.label}>
+                <Text variant="labelLarge">
+                  Ubicación donde realizar el servicio
+                </Text>
+              </View>
+              <View style={styles.component}>
+                <TextInput
+                  mode="outlined"
+                  value={userAddress}
+                  onChangeText={(text) => { return setDescription(text); }}
+                  outlineStyle={{ borderRadius: 12 }}
+                  style={styles.input}
+                  theme={{ colors: { primary: primaryColor } }}
+                  multiline
+                  numberOfLines={4}
+                  disabled
+                  activeOutlineColor="transparent"
+                  outlineColor="transparent"
+                  textColor={primaryColor}
+                  selectionColor={primaryColor}
+                />
+                <View style={{ marginTop: 16 }}>
+                  {loadingLocation
+                    ? (
+                      <ActivityIndicator
+                        animating
+                        style={styles.map}
+                      />
+                    )
+                    : (
+                      <MapView
+                        style={styles.map}
+                        provider={PROVIDER_GOOGLE}
+                        region={mapRegion}
+                        addressForCoordinate
+                      >
+                        <Marker
+                          coordinate={mapRegion}
+                          title="marker"
+                          {...!readOnly && { draggable: true }}
+                          onDragEnd={(e) => {
+                            serUserPosition({
+                              latitude: e.nativeEvent.coordinate.latitude,
+                              longitude: e.nativeEvent.coordinate.longitude,
+                            });
+                          }}
+                        />
+                      </MapView>
+                    )}
+                </View>
+              </View>
+            </View>
+            <View>
+              <View style={styles.label}>
+                <Text variant="labelLarge">
+                  Imágenes referenciales (opcional)
+                </Text>
+              </View>
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {image && <Image source={{ uri: image.uri }} style={{ width: 200, height: 200 }} />}
+              </View>
+              {!readOnly
+                    && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        width: '100%',
+                        justifyContent: 'center',
+                        ...styles.component,
+                      }}
+                    >
+                      <Button icon="file" onPress={selectImageFromFile}>
+                        Seleccionar imagen
+                      </Button>
+                      <Button icon="camera" onPress={selectImageFromCamera}>
+                        Tomar foto
+                      </Button>
+                    </View>
+                    )}
+            </View>
+            { !readOnly && (
+            <View style={styles.component}>
+              <Button
+                mode="contained"
+                loading={createServiceLoading}
+                onPress={handleCreateService}
+              >
+                Publicar
+              </Button>
+            </View>
+            )}
+            {(user.uid !== serviceData?.userUid && readOnly) && (
+            <View style={{ marginTop: 32 }}>
+              <View style={styles.label}>
+                <Text variant="labelLarge">
+                  Ingrese una cotización del servicio
+                </Text>
+              </View>
+              <View style={styles.component}>
+                <TextInput
+                  mode="outlined"
+                  value={price || applyingServiceData?.price}
+                  onChangeText={(text) => { return setPrice(text); }}
+                  outlineStyle={{ borderRadius: 12 }}
+                  style={styles.input}
+                  theme={{ colors: { primary: primaryColor } }}
+                  activeOutlineColor="transparent"
+                  outlineColor="transparent"
+                  textColor={primaryColor}
+                  selectionColor={primaryColor}
+                  keyboardType="number-pad"
+                />
+              </View>
+              <View style={styles.label}>
+                <Text variant="labelLarge">
+                  Ingrese una numero de contacto
+                </Text>
+              </View>
+              <View style={styles.component}>
+                <TextInput
+                  mode="outlined"
+                  value={phoneNumber || applyingServiceData?.phoneNumber}
+                  onChangeText={(text) => { return setPhoneNumber(text); }}
+                  outlineStyle={{ borderRadius: 12 }}
+                  style={styles.input}
+                  theme={{ colors: { primary: primaryColor } }}
+                  activeOutlineColor="transparent"
+                  outlineColor="transparent"
+                  textColor={primaryColor}
+                  selectionColor={primaryColor}
+                  keyboardType="number-pad"
+                />
+              </View>
+              {!applying && (
+              <View style={styles.component}>
+                <Button
+                  mode="contained"
+                  loading={createApplyingServiceLoading}
+                  onPress={handleApplyingService}
+                >
+                  Aplicar
+                </Button>
+              </View>
               )}
+            </View>
+            )}
+
           </View>
-        </View>
-      </View>
-      <View>
-        <View style={styles.label}>
-          <Text variant="labelLarge">
-            Imágenes referenciales (opcional)
-          </Text>
-        </View>
-        <View
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {image && <Image source={{ uri: image.uri }} style={{ width: 200, height: 200 }} />}
-        </View>
-        <View
-          style={{
-            flexDirection: 'row',
-            width: '100%',
-            justifyContent: 'center',
-            ...styles.component,
-          }}
-        >
-          <Button icon="file" onPress={selectImageFromFile}>
-            Seleccionar imagen
-          </Button>
-          <Button icon="camera" onPress={selectImageFromCamera}>
-            Tomar foto
-          </Button>
-        </View>
-      </View>
-      <View style={styles.component}>
-        <Button
-          mode="contained"
-          loading={createServiceLoading}
-          onPress={handleCreateService}
-        >
-          Publicar
-        </Button>
-      </View>
+        ) : (
+          <ActivityIndicator
+            animating
+            style={styles.loader}
+          />
+        )
+      }
+
     </ScrollView>
   );
 };

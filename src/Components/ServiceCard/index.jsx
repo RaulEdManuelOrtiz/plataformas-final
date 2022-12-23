@@ -42,17 +42,29 @@ const styles = StyleSheet.create({
   },
 });
 
-const iconColor = {
+export const iconColor = {
   Creado: 'green',
   Solicitado: 'green',
   Acordado: 'blue',
   Cerrado: 'red',
+  'En evaluacion': 'yellow',
 };
-const ServiceCard = ({ navigation, item, displayStatus = true }) => {
+const ServiceCard = ({
+  navigation, item, displayStatus = true, uiData, setUiData, applying = false,
+}) => {
   return (
     <TouchableRipple
       rippleColor="rgba(0, 0, 0, .32)"
-      onPress={() => { navigation.navigate('CreateService'); }}
+      onPress={() => {
+        setUiData({
+          ...uiData,
+          serviceId: applying ? item.serviceId : item.id,
+          readOnly: true,
+          applying,
+          applyingServiceId: applying ? item.id : '',
+        });
+        navigation.navigate('CreateService');
+      }}
       style={{ borderRadius: 15 }}
     >
       <View style={styles.container}>
@@ -68,19 +80,7 @@ const ServiceCard = ({ navigation, item, displayStatus = true }) => {
           <Text variant="bodySmall" style={{ color: primaryColor }}>
             {item.address}
           </Text>
-          {displayStatus ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
-              <IconButton
-                size={10}
-                style={{ marginLeft: -6, marginRight: -2 }}
-                iconColor={iconColor[item.status]}
-                icon="checkbox-blank-circle"
-              />
-              <Text variant="bodySmall" style={{ color: primaryColor }}>
-                {item.status}
-              </Text>
-            </View>
-          ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={styles.categoriesContainer}>
               <View
                 style={styles.chip}
@@ -90,7 +90,28 @@ const ServiceCard = ({ navigation, item, displayStatus = true }) => {
                 </Text>
               </View>
             </View>
-          )}
+            {displayStatus && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                marginTop: 10,
+                marginLeft: 10,
+              }}
+            >
+              <IconButton
+                size={10}
+                style={{ marginLeft: -6, marginRight: -2 }}
+                iconColor={iconColor[item.status]}
+              icon="checkbox-blank-circle"
+              />
+              <Text variant="bodySmall" style={{ color: primaryColor }}>
+                {item.status}
+              </Text>
+            </View>
+            )}
+          </View>
         </View>
       </View>
     </TouchableRipple>

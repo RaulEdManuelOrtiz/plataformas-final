@@ -97,12 +97,22 @@ export const createServiceFunc = async ({
   }
 };
 
+const getAllServicesQuery = (userUid) => {
+  return query(
+    collection(db, 'service'),
+    where('userUid', '!=', userUid),
+  );
+};
+
 export const getAllServices = async (userUid, setServices) => {
+  console.log;
   const myServicesArray = [];
   const q = query(
     collection(db, 'service'),
     where('userUid', '!=', userUid),
   );
+
+  onSnapshot();
   const querySnapshot = await getDocs(q);
 
   querySnapshot.forEach((document) => {

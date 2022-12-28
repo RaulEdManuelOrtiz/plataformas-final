@@ -134,7 +134,7 @@ const UserProfile = ({ navigation }) => {
     setLoadingContract(false);
     navigation.goBack();
   };
-  console.log(applyingServices);
+
   return (
     <View>
       <Card style={styles.cardContainer}>

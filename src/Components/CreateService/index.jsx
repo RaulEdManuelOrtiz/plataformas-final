@@ -14,7 +14,6 @@ import {
   addDoc,
   collection, doc, getDoc, onSnapshot, query, Timestamp, updateDoc, arrayUnion, where,
 } from 'firebase/firestore';
-import auth from '@react-native-firebase/auth';
 import {
   createServiceFunc, getCategories,
 } from '../../Firebase/utils';
@@ -697,17 +696,19 @@ const CreateService = ({ navigation }) => {
                 icon="cellphone"
                 iconColor={primaryColor}
                 size={36}
-                  // onPress={() => { auth().signOut(); }}
+                // onPress={() => { Linking.openURL(`whatsapp://send?phone=${serviceData?.phoneNumber}`); }}
               />
               <IconButton
                 icon="whatsapp"
                 iconColor={primaryColor}
                 size={36}
+                // onPress={() => { Linking.openURL(`tel:${serviceData?.phoneNumber}`); }}
               />
               <IconButton
                 icon="email"
                 iconColor={primaryColor}
                 size={36}
+                // onPress={() => { Linking.openURL(`mailto:${serviceData?.email}`); }}
               />
               {/* {applyingServices[0]} */}
             </View>

@@ -11,6 +11,16 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "plugins": [
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "1213430165915534",
+          "clientToken": "d732d80c8b14ff7122d5eb3bd24976a2",
+          "displayName": "Plataformas"
+        }
+      ]
+    ],
     "updates": {
       "fallbackToCacheTimeout": 0
     },
